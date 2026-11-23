@@ -67,7 +67,7 @@
 
 ### 方式一：Windows 免安装版（推荐）
 
-1. 在 [Releases](../../releases) 下载 `佳兴族谱.exe`
+1. 在 [Releases](../../releases) 下载 `JiaXingZupu.exe`（佳兴族谱）
 2. 把 exe 放到任意文件夹，双击运行
 3. 浏览器会自动打开 `http://127.0.0.1:8765`
 4. 使用默认账号登录，即可开始建谱
