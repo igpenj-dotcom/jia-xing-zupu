@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>陈氏宗谱 · 佳兴族谱</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%239c3b2e'/%3E%3Ctext x='32' y='45' font-size='38' font-family='serif' fill='%23f7f2e8' text-anchor='middle'%3E谱%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="seal">谱</div>
+      <div class="brand-text">
+        <div class="brand-title">
+          <h1 id="familyTitle" title="点击修改完整谱名">陈氏宗谱</h1>
+          <button type="button" class="title-edit" id="btnRenameFamily" title="修改完整谱名" aria-label="修改完整谱名">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 20h4L18.5 9.5a2.4 2.4 0 0 0-3.4-3.4L4.5 16.5 4 20z"/>
+              <path d="M13.6 7.6l3.2 3.2"/>
+            </svg>
+          </button>
+        </div>
+        <p>佳兴族谱 · 世系传承</p>
+      </div>
+    </div>
+
+    <nav class="views" role="tablist">
+      <button class="tab active" data-view="tree" role="tab">族谱关系图</button>
+      <button class="tab" data-view="list" role="tab">成员名录</button>
+    </nav>
+
+    <div class="actions">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+        <input id="searchInput" type="search" placeholder="搜索姓名 / 生年" autocomplete="off">
+      </div>
+      <div class="menu-wrap">
+        <button class="btn ghost" id="btnExport" aria-haspopup="true" aria-expanded="false">导出</button>
+        <div class="menu" id="exportMenu" role="menu">
+          <button type="button" data-export="png" role="menuitem">导出族谱图片（PNG）</button>
+          <button type="button" data-export="pdf" role="menuitem">导出族谱 PDF</button>
+          <button type="button" data-export="gedcom" role="menuitem">导出 GEDCOM（.ged）</button>
+          <div class="menu-sep"></div>
+          <button type="button" data-export="json" role="menuitem">备份数据（JSON）</button>
+        </div>
+      </div>
+      <button class="btn ghost only-wide" id="btnImport">导入</button>
+      <button class="btn secondary" id="btnReturn">归宗</button>
+      <button class="btn primary" id="btnBirth">添丁</button>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <main>
+    <section class="view active" id="treeView">
+      <div class="tree-viewport" id="treeViewport">
+        <div class="tree-canvas" id="treeCanvas">
+          <svg class="tree-links" id="treeLinks" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="tree-nodes" id="treeNodes"></div>
+        </div>
+
+        <div class="legend">
+          <span><i class="dot male"></i>男性</span>
+          <span><i class="dot female"></i>女性</span>
+          <span><i class="line"></i>婚配</span>
+          <span><i class="tag-sample">归宗</i>归宗入谱</span>
+        </div>
+
+        <div class="tree-tools">
+          <button data-zoom="out" title="缩小">−</button>
+          <span id="zoomLabel">100%</span>
+          <button data-zoom="in" title="放大">+</button>
+          <button data-zoom="fit" title="适应窗口">⤢</button>
+        </div>
+
+        <div class="tree-hint">点击人物查看档案 · 滚轮缩放 · 拖动平移</div>
+      </div>
+    </section>
+
+    <section class="view" id="listView">
+      <div class="list-toolbar">
+        <div class="chip-row" id="genderFilter">
+          <button class="filter-chip active" data-gender="all">全部</button>
+          <button class="filter-chip" data-gender="male">男丁</button>
+          <button class="filter-chip" data-gender="female">女眷</button>
+        </div>
+        <div class="toolbar-right">
+          <label class="select-wrap">
+            <span>世代</span>
+            <select id="genFilter"><option value="all">全部世代</option></select>
+          </label>
+          <label class="select-wrap">
+            <span>排序</span>
+            <select id="sortBy">
+              <option value="gen">按世代</option>
+              <option value="birth">按生年</option>
+              <option value="name">按姓名</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="member-grid" id="memberGrid"></div>
+    </section>
+  </main>
+</div>
+
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+
+<div class="modal" id="memberModal" aria-hidden="true">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <header class="modal-head">
+      <h2 id="modalTitle">添丁入谱</h2>
+      <button class="icon-btn" data-close aria-label="关闭">×</button>
+    </header>
+
+    <div class="seg" id="entryTabs">
+      <button type="button" class="active" data-entry="birth">添丁</button>
+      <button type="button" data-entry="return">归宗</button>
+    </div>
+
+    <form id="memberForm" class="modal-body">
+      <div class="form-grid">
+        <label class="field">
+          <span>姓名 <b>*</b></span>
+          <input name="name" maxlength="24" required placeholder="如：陈志远">
+        </label>
+        <label class="field">
+          <span>性别</span>
+          <div class="radio-row">
+            <label><input type="radio" name="gender" value="male" checked><i>男</i></label>
+            <label><input type="radio" name="gender" value="female"><i>女</i></label>
+          </div>
+        </label>
+        <label class="field">
+          <span>出生时间</span>
+          <input name="birth" maxlength="24" placeholder="如 1982 或 1982-04-16">
+        </label>
+        <label class="field">
+          <span>父亲</span>
+          <select name="fatherId" id="fatherSelect"><option value="">（无）</option></select>
+        </label>
+        <label class="field">
+          <span>母亲</span>
+          <select name="motherId" id="motherSelect"><option value="">（无）</option></select>
+        </label>
+        <label class="field">
+          <span>与父母关系</span>
+          <select name="childKind">
+            <option value="birth">亲生</option>
+            <option value="adopted">收养</option>
+            <option value="inherited">过继</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="form-hint" id="formHint">选择父母后，新成员会自动排入相应世代；不选父母则作为一支始祖（第一世）。</p>
+
+      <label class="field block" id="returnNoteWrap" hidden>
+        <span>归宗说明</span>
+        <textarea name="returnNote" rows="2" maxlength="200" placeholder="如：幼年出继外姓，2008年清明携眷归宗"></textarea>
+      </label>
+
+      <label class="field block">
+        <span>人物简介 <em>（可稍后在档案中完善）</em></span>
+        <textarea name="bio" rows="3" maxlength="2000" placeholder="生平、职业、居所……"></textarea>
+      </label>
+
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" data-close>取消</button>
+        <button type="submit" class="btn primary" id="modalSubmit">确认入谱</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="kinModal" aria-hidden="true">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-card narrow" role="dialog" aria-modal="true">
+    <header class="modal-head">
+      <h2 id="kinTitle">添加亲属</h2>
+      <button class="icon-btn" data-close aria-label="关闭">×</button>
+    </header>
+
+    <div class="seg" id="kinRoles">
+      <button type="button" data-role="spouse">配偶</button>
+      <button type="button" data-role="father">父亲</button>
+      <button type="button" data-role="mother">母亲</button>
+    </div>
+
+    <form id="kinForm" class="modal-body">
+      <div class="form-grid">
+        <label class="field">
+          <span>姓名 <b>*</b></span>
+          <input name="name" maxlength="24" required placeholder="姓名">
+        </label>
+        <label class="field" id="kinGenderField">
+          <span>性别</span>
+          <div class="radio-row">
+            <label><input type="radio" name="gender" value="male"><i>男</i></label>
+            <label><input type="radio" name="gender" value="female"><i>女</i></label>
+          </div>
+        </label>
+        <label class="field">
+          <span>出生时间</span>
+          <input name="birth" maxlength="24" placeholder="如 1900 或 1900-03-12">
+        </label>
+        <label class="field">
+          <span>死亡时间</span>
+          <input name="death" maxlength="24" placeholder="健在可留空">
+        </label>
+      </div>
+
+      <p class="form-hint" id="kinHint"></p>
+
+      <label class="field block">
+        <span>人物简介 <em>（可稍后在档案中完善）</em></span>
+        <textarea name="bio" rows="3" maxlength="2000" placeholder="籍贯、娘家、生平……"></textarea>
+      </label>
+
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" data-close>取消</button>
+        <button type="submit" class="btn primary">确认添加</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="binModal" aria-hidden="true">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-card narrow" role="dialog" aria-modal="true">
+    <header class="modal-head">
+      <h2>回收站</h2>
+      <button class="icon-btn" data-close aria-label="关闭">×</button>
+    </header>
+    <div class="modal-body">
+      <p class="form-hint">移入回收站的人物不会显示在谱中，可随时还原；彻底删除后无法恢复。</p>
+      <div class="record-list" id="binList"></div>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" id="btnClearBin">清空回收站</button>
+        <button type="button" class="btn ghost" data-close>关闭</button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="logModal" aria-hidden="true">
+  <div class="modal-mask" data-close></div>
+  <div class="modal-card narrow" role="dialog" aria-modal="true">
+    <header class="modal-head">
+      <h2>操作日志</h2>
+      <button class="icon-btn" data-close aria-label="关闭">×</button>
+    </header>
+    <div class="modal-body">
+      <p class="form-hint">记录添丁、归宗、修改档案、删除、导入导出等操作，最多保留最近 400 条。</p>
+      <div class="record-list" id="logList"></div>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" id="btnClearLog">清空日志</button>
+        <button type="button" class="btn ghost" data-close>关闭</button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<div class="login-screen" id="loginScreen">
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <div class="login-seal">谱</div>
+    <h2 id="loginTitle">佳兴族谱</h2>
+    <p class="login-sub">电子族谱 · 登录后查看与管理族谱</p>
+    <label class="field">
+      <span>账号</span>
+      <input name="username" maxlength="32" autocomplete="username" placeholder="请输入账号">
+    </label>
+    <label class="field">
+      <span>密码</span>
+      <input name="password" type="password" maxlength="64" autocomplete="current-password" placeholder="请输入密码">
+    </label>
+    <p class="login-error" id="loginError"></p>
+    <button class="btn primary login-btn" type="submit" id="loginSubmit">登 录</button>
+    <p class="login-note">数据保存在本机数据库中，请勿在公用电脑上保持登录状态。</p>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script src="assets/pdf.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
