@@ -287,6 +287,24 @@
 <div class="toast" id="toast"></div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 
+<!-- 头像裁剪 -->
+<div class="crop-modal" id="cropModal" hidden>
+  <div class="crop-panel">
+    <h3>裁剪头像</h3>
+    <p class="crop-tip">拖动图片调整位置，滑动缩放；圆形区域即头像最终效果</p>
+    <div class="crop-stage" id="cropStage">
+      <canvas id="cropCanvas" width="320" height="320"></canvas>
+    </div>
+    <label class="crop-zoom">缩放
+      <input type="range" id="cropZoom" min="1" max="3" step="0.01" value="1">
+    </label>
+    <div class="crop-actions">
+      <button type="button" class="btn secondary" id="cropCancel">取消</button>
+      <button type="button" class="btn primary" id="cropOk">使用此图</button>
+    </div>
+  </div>
+</div>
+
 <script src="assets/pdf.js"></script>
 <script src="assets/app.js"></script>
 </body>

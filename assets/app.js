@@ -1088,7 +1088,10 @@
 
     return '<div class="drawer-head">' +
       '<button class="icon-btn" id="drawerClose" aria-label="关闭">×</button>' +
-      '<div class="profile">' + avatarHtml(m) +
+      '<div class="profile">' +
+      (m.photo
+        ? '<div class="profile-photo" data-photo-view="1" role="button" tabindex="0" title="点击查看大图">' + avatarHtml(m) + '</div>'
+        : avatarHtml(m)) +
       '<div class="profile-main"><h2>' + esc(m.name) + '</h2>' +
       '<p class="profile-sub">' + esc(relationLine(m)) + '</p>' +
       '<div class="profile-tags">' + tags.join('') + '</div>' +
@@ -1118,6 +1121,17 @@
 
   function bindViewEvents(m) {
     $('#drawerClose').addEventListener('click', closeDrawer);
+    const photoBox = $('[data-photo-view]');
+    if (photoBox) {
+      const open = () => openPhotoViewer(m.photo, m.name);
+      photoBox.addEventListener('click', open);
+      photoBox.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      });
+    }
     $('#btnEdit').addEventListener('click', () => {
       state.editing = true;
       state.pendingPhoto = null;
@@ -1252,7 +1266,7 @@
     $('#photoInput').addEventListener('change', e => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
-      compressImage(file, dataUrl => {
+      openCropper(file, dataUrl => {
         state.pendingPhoto = dataUrl;
         $('#photoPreview').innerHTML = avatarHtml({ name: m.name, gender: m.gender, photo: dataUrl });
         const removeBtn = $('#btnRemovePhoto');
@@ -1414,22 +1428,107 @@
     });
   }
 
-  function compressImage(file, cb) {
+  function openPhotoViewer(src, name) {
+    if (!src) return;
+    let el = $('#photoViewer');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'photoViewer';
+      el.className = 'photo-viewer';
+      el.innerHTML = '<button type="button" class="pv-close" aria-label="关闭">×</button>' +
+        '<figure><img alt=""><figcaption></figcaption></figure>';
+      document.body.appendChild(el);
+      el.addEventListener('click', e => {
+        if (e.target === el || e.target.closest('.pv-close')) el.classList.remove('open');
+      });
+    }
+    el.querySelector('img').src = src;
+    el.querySelector('img').alt = name || '照片';
+    el.querySelector('figcaption').textContent = name || '';
+    el.classList.add('open');
+  }
+
+  /* 头像裁剪：拖动定位、滑块缩放，输出 512×512 方形底图，页面中按圆形显示 */
+  function openCropper(file, onDone) {
+    const modal = $('#cropModal');
+    const stage = $('#cropStage');
+    const cvs = $('#cropCanvas');
+    const zoomEl = $('#cropZoom');
+    const ctx = cvs.getContext('2d');
+    const SIZE = 320;
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const max = 640;
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(img.width * scale));
-        canvas.height = Math.max(1, Math.round(img.height * scale));
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        try {
-          cb(canvas.toDataURL('image/jpeg', 0.82));
-        } catch (err) {
-          cb(String(reader.result));
+        let zoom = 1;
+        let dx = 0;
+        let dy = 0;
+        let dragging = false;
+        let startX = 0;
+        let startY = 0;
+        const base = Math.max(SIZE / img.width, SIZE / img.height);
+        function clampOffset() {
+          const scale = base * zoom;
+          const maxX = Math.max(0, (img.width * scale - SIZE) / 2);
+          const maxY = Math.max(0, (img.height * scale - SIZE) / 2);
+          dx = Math.max(-maxX, Math.min(maxX, dx));
+          dy = Math.max(-maxY, Math.min(maxY, dy));
         }
+        function draw() {
+          clampOffset();
+          const scale = base * zoom;
+          const w = img.width * scale;
+          const h = img.height * scale;
+          ctx.clearRect(0, 0, SIZE, SIZE);
+          ctx.drawImage(img, SIZE / 2 + dx - w / 2, SIZE / 2 + dy - h / 2, w, h);
+        }
+        zoom = 1;
+        dx = 0;
+        dy = 0;
+        zoomEl.value = '1';
+        draw();
+        modal.hidden = false;
+
+        zoomEl.oninput = () => {
+          zoom = parseFloat(zoomEl.value) || 1;
+          draw();
+        };
+        stage.onpointerdown = ev => {
+          dragging = true;
+          startX = ev.clientX - dx;
+          startY = ev.clientY - dy;
+          try { stage.setPointerCapture(ev.pointerId); } catch (err) { /* ignore */ }
+        };
+        stage.onpointermove = ev => {
+          if (!dragging) return;
+          dx = ev.clientX - startX;
+          dy = ev.clientY - startY;
+          draw();
+        };
+        stage.onpointerup = ev => {
+          dragging = false;
+          try { stage.releasePointerCapture(ev.pointerId); } catch (err) { /* ignore */ }
+        };
+        stage.onpointercancel = () => { dragging = false; };
+
+        $('#cropCancel').onclick = () => { modal.hidden = true; };
+        $('#cropOk').onclick = () => {
+          const scale = base * zoom;
+          const w = img.width * scale;
+          const h = img.height * scale;
+          const left = SIZE / 2 + dx - w / 2;
+          const top = SIZE / 2 + dy - h / 2;
+          const out = document.createElement('canvas');
+          out.width = 512;
+          out.height = 512;
+          const octx = out.getContext('2d');
+          const k = 512 / SIZE;
+          octx.fillStyle = '#ffffff';
+          octx.fillRect(0, 0, 512, 512);
+          octx.drawImage(img, left * k, top * k, w * k, h * k);
+          modal.hidden = true;
+          onDone(out.toDataURL('image/jpeg', 0.9));
+        };
       };
       img.onerror = () => toast('照片读取失败，请换一张图片', 'error');
       img.src = String(reader.result);
@@ -2563,6 +2662,14 @@
     // 键盘
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
+        if ($('#cropModal') && !$('#cropModal').hidden) {
+          $('#cropModal').hidden = true;
+          return;
+        }
+        if ($('#photoViewer') && $('#photoViewer').classList.contains('open')) {
+          $('#photoViewer').classList.remove('open');
+          return;
+        }
         closeExportMenu();
         if ($('#binModal').classList.contains('open')) closeBinModal();
         else if ($('#logModal').classList.contains('open')) closeLogModal();
